@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Flow Automator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-row">
+        <div class="brand-meta">
+          <div class="brand-title-wrap">
+            <h1 class="brand-title">Flow Automator</h1>
+            <span class="brand-sparkle" aria-hidden="true">✦</span>
+          </div>
+          <span class="brand-sub">Bulk AI Image &amp; Video Gen <span class="brand-ver">v2.0.0</span></span>
+        </div>
+        <div class="brand-actions">
+          <button type="button" id="historyHeaderBtn" class="icon-header-btn" title="Run history" aria-label="History">
+            <svg viewBox="0 0 24 24" class="hdr-icon" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <button type="button" id="settingsHeaderBtn" class="icon-header-btn" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" class="hdr-icon" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Clapperboard Take Counter & Status -->
+      <div class="clapper-strip">
+        <div class="take-counter-row">
+          <span id="takeCounterText" class="take-counter">TAKE 000 / 000</span>
+          <div id="statusChip" class="status-chip chip-ready" role="status">
+            <span class="status-dot"></span>
+            <span id="statusChipLabel" class="status-text">Ready · Open Flow</span>
+          </div>
+        </div>
+        <!-- Diagonal striped progress bar -->
+        <div class="clapper-bar-track">
+          <div id="clapperBarFill" class="clapper-bar-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Segmented Mode Control: Images | Videos -->
+      <nav class="mode-tabs-nav" aria-label="Media Mode">
+        <button type="button" id="tabImagesBtn" class="mode-tab-btn active" data-mode="images">
+          <span class="mode-tab-icon">🖼</span>
+          <span>Images</span>
+        </button>
+        <button type="button" id="tabVideosBtn" class="mode-tab-btn" data-mode="videos">
+          <span class="mode-tab-icon">▶</span>
+          <span>Videos</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- Scrollable content area -->
+    <main class="app-main">
+      <!-- Section: Model and Output Parameters -->
+      <section class="collapsible-section" id="sectionModel">
+        <div class="section-header" data-toggle="sectionModel">
+          <h2 class="section-title">Model and output</h2>
+          <span class="toggle-indicator">▾</span>
+        </div>
+        <div class="section-content">
+          <!-- Images Specific Options -->
+          <div id="imagesOptionsBlock" class="mode-options-panel">
+            <div class="option-field">
+              <label class="field-label">Model</label>
+              <div id="imageModelChips" class="chips-grid chips-col-1"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Aspect ratio</label>
+              <div id="imageAspectChips" class="chips-row"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Images per prompt</label>
+              <div id="imageCountChips" class="chips-row"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Image quality</label>
+              <div id="imageQualityChips" class="chips-grid chips-col-2"></div>
+              <p class="field-subtext">2K/4K use an extra upscale step with its own daily quota, and fall back to Standard if unavailable.</p>
+            </div>
+          </div>
+
+          <!-- Videos Specific Options -->
+          <div id="videosOptionsBlock" class="mode-options-panel" hidden>
+            <div class="option-field">
+              <label class="field-label">Video mode</label>
+              <div id="videoModeChips" class="chips-grid chips-col-4"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Video model</label>
+              <div id="videoModelChips" class="chips-grid chips-col-2"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Aspect ratio</label>
+              <div id="videoAspectChips" class="chips-row"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Duration</label>
+              <div id="videoDurationChips" class="chips-row"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Videos per prompt</label>
+              <div id="videoCountChips" class="chips-row"></div>
+            </div>
+
+            <div class="option-field">
+              <label class="field-label">Upscale</label>
+              <div id="videoUpscaleChips" class="chips-row"></div>
+            </div>
+          </div>
+
+          <!-- Speed Presets (Common to both) -->
+          <div class="option-field">
+            <label class="field-label">Generation Speed</label>
+            <div id="speedPresetChips" class="chips-row"></div>
+            <div id="customSpeedInputs" class="custom-speed-row" hidden>
+              <label>Min s: <input type="number" id="customMinS" min="1" max="60" value="5"></label>
+              <label>Max s: <input type="number" id="customMaxS" min="1" max="120" value="12"></label>
+              <label>Concurrency: <input type="number" id="customConcurrency" min="1" max="3" value="1"></label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Reference Images -->
+      <section class="collapsible-section" id="sectionRefs">
+        <div class="section-header" data-toggle="sectionRefs">
+          <h2 class="section-title">Reference Images <span class="header-sub-tag">Subject · Scene · Style</span></h2>
+          <span class="toggle-indicator">▾</span>
+        </div>
+        <div class="section-content">
+          <div id="refPickerContainer"></div>
+
+          <!-- Different image for each prompt button -->
+          <div class="override-action-wrap">
+            <button type="button" id="perPromptRefGuideBtn" class="btn-override-helper">
+              <span class="override-icon">⇄</span>
+              <span>Different image for each prompt...</span>
+            </button>
+            <p class="field-subtext">Give specific prompts their own references (up to 100) — overrides the global ones using tags like <code class="tag-code">[subject: hero.png]</code>.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Prompts Input -->
+      <section class="collapsible-section" id="sectionPrompts">
+        <div class="section-header" data-toggle="sectionPrompts">
+          <div class="section-title-wrap">
+            <h2 class="section-title">Prompts</h2>
+            <span id="promptsCountBadge" class="count-tag">0 prompts</span>
+          </div>
+          <span class="toggle-indicator">▾</span>
+        </div>
+        <div class="section-content">
+          <!-- Input Mode Tabs: Upload File | Paste Text -->
+          <div class="prompt-input-tabs" role="tablist">
+            <button type="button" id="tabUploadFileBtn" class="prompt-subtab active" role="tab" aria-selected="true">Upload File</button>
+            <button type="button" id="tabPasteTextBtn" class="prompt-subtab" role="tab" aria-selected="false">Paste Text</button>
+          </div>
+
+          <!-- Upload Drop Zone -->
+          <div id="uploadDropZone" class="drop-zone-box">
+            <input type="file" id="promptFileInput" accept=".txt,text/plain" style="display:none">
+            <div class="drop-zone-content">
+              <span class="drop-arrow">↑</span>
+              <p class="drop-primary">Drop a .txt file or click to browse</p>
+              <p class="drop-secondary">Loads automatically · separate prompts with a blank line</p>
+            </div>
+          </div>
+
+          <!-- Paste Textarea -->
+          <div id="pasteTextZone" class="paste-zone-box" hidden>
+            <textarea id="promptsRawInput" class="prompts-textarea" placeholder="Paste prompts here. Separate each prompt with a blank line.
+
+Example:
+[subject: hero.png, scene: forest.png] A lone warrior standing in the rain.
+
+[style: anime.png] The ancient city gates open at sunrise."></textarea>
+            <div class="paste-actions-row">
+              <button type="button" id="applyPastedPromptsBtn" class="btn-subtle-primary">Add to Queue</button>
+              <button type="button" id="clearPastedPromptsBtn" class="btn-subtle">Clear</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Queue & Prompts List -->
+      <section class="collapsible-section" id="sectionQueue">
+        <div class="section-header" data-toggle="sectionQueue">
+          <div class="section-title-wrap">
+            <h2 class="section-title">Queue</h2>
+            <div id="queueSelectorTabs" class="queue-nav-tabs"></div>
+          </div>
+          <span class="toggle-indicator">▾</span>
+        </div>
+        <div class="section-content">
+          <div class="queue-toolbar">
+            <span id="queueMetaInfo" class="queue-meta-text">0 prompts loaded</span>
+            <div class="queue-actions">
+              <button type="button" id="clearQueueBtn" class="btn-text-action">Clear queue</button>
+            </div>
+          </div>
+          <div id="queueListContainer" class="queue-items-container"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Sticky Bottom Action Bar -->
+    <footer class="app-sticky-footer">
+      <div class="action-buttons-grid">
+        <button type="button" id="mainStartBtn" class="btn-action-start">Start</button>
+        <button type="button" id="mainPauseBtn" class="btn-action-pause" hidden>Pause</button>
+        <button type="button" id="mainStopBtn" class="btn-action-stop" disabled>Stop</button>
+      </div>
+    </footer>
+
+    <!-- Sheets Containers -->
+    <div id="settingsSheetContainer" class="sheet-portal"></div>
+    <div id="historySheetContainer" class="sheet-portal"></div>
+    <div id="librarySheetContainer" class="sheet-portal"></div>
+    <div id="guideSheetContainer" class="sheet-portal"></div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

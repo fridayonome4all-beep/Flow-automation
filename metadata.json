@@ -1,0 +1,8 @@
+{
+  "name": "FlowBatch - Bulk Google Flow Studio & Extension",
+  "description": "FlowBatch Google Flow batch automation extension and studio featuring reference turnaround sheets, automatic @-tagging prompt scanner, video start/end frames, and universal ID file naming.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

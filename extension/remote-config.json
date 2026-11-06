@@ -1,0 +1,17 @@
+{
+  "version": "2026.11.2",
+  "updatedAt": "2026-11-02T09:00:00Z",
+  "selectors": {
+    "promptBox": "textarea, [contenteditable=\"true\"], [role=\"textbox\"], input[placeholder*=\"prompt\" i]",
+    "submitButtons": "button[aria-label*=\"Generate\" i], button[aria-label*=\"Create\" i], button[aria-label*=\"Run\" i]",
+    "referenceTrigger": "button[aria-label*=\"Reference\" i], button[aria-label*=\"Add image\" i]",
+    "upscaleButton": "button[aria-label*=\"Upscale\" i], [data-action=\"upscale\"]",
+    "videoModeTabs": "[role=\"tab\"][aria-label*=\"Video\" i]",
+    "resolutionDropdown": "[aria-label*=\"Resolution\" i]"
+  },
+  "models": {
+    "image": ["Nano Banana Pro", "Nano Banana 2.1", "Nano Banana Lite", "Imagen 3"],
+    "video": ["Veo 3.1 Quality", "Veo 3.1 Fast", "Veo 3.1 Lite"]
+  },
+  "resolutions": ["720p", "1080p", "2K", "4K"]
+}

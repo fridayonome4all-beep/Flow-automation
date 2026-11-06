@@ -1,0 +1,397 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flow Batch source</title>
+<style>
+:root{--bg:#fbfbfc;--panel:#f0f1f4;--line:#d9dce3;--text:#16181d;--mute:#5d6370;--accent:#1a6fd1;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#101114;--panel:#1a1c21;--line:#2c2f37;--text:#eceef2;--mute:#8b909c;--accent:#7cc4ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101114;--panel:#1a1c21;--line:#2c2f37;--text:#eceef2;--mute:#8b909c;--accent:#7cc4ff;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif;padding:16px;max-width:760px;margin-inline:auto}
+h1{font-size:22px;margin:4px 0 6px}
+h2{font-size:16px;margin:0;font-family:ui-monospace,monospace}
+p{margin:2px 0;color:var(--mute)}
+ol{color:var(--mute);padding-left:20px}
+section{margin-top:22px}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+button{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 16px;cursor:pointer}
+button.done{border-color:var(--accent);color:var(--accent)}
+pre{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto;max-height:420px;overflow-y:auto}
+code{font:12px/1.45 ui-monospace,monospace;color:var(--text);white-space:pre}
+</style></head><body>
+<h1>Flow Batch: full source</h1>
+<p>Six files. Tap Copy on each one and save it with the exact file name inside one folder called <b>flow-batch</b>.</p>
+<ol><li>Create the folder and the six files.</li><li>Open your browser’s extensions page and turn on Developer mode.</li><li>Choose Load unpacked and pick the folder.</li><li>Open Google Flow in a tab, open the extension, add prompts, press Start.</li></ol>
+<section><div class="hd"><div><h2>manifest.json</h2><p>Extension settings. Save this first.</p></div><button class="copy">Copy</button></div><pre><code>{
+  &quot;manifest_version&quot;: 3,
+  &quot;name&quot;: &quot;Flow Batch&quot;,
+  &quot;version&quot;: &quot;0.1.0&quot;,
+  &quot;description&quot;: &quot;Queue many prompts and run them in Google Flow, then save results with ordered file names.&quot;,
+  &quot;permissions&quot;: [&quot;storage&quot;, &quot;downloads&quot;, &quot;tabs&quot;],
+  &quot;host_permissions&quot;: [&quot;https://labs.google/*&quot;],
+  &quot;action&quot;: { &quot;default_popup&quot;: &quot;popup.html&quot;, &quot;default_title&quot;: &quot;Flow Batch&quot; },
+  &quot;background&quot;: { &quot;service_worker&quot;: &quot;background.js&quot; },
+  &quot;content_scripts&quot;: [
+    { &quot;matches&quot;: [&quot;https://labs.google/*&quot;], &quot;js&quot;: [&quot;content.js&quot;], &quot;run_at&quot;: &quot;document_idle&quot; }
+  ]
+}
+</code></pre></section>
+<section><div class="hd"><div><h2>background.js</h2><p>Saves files with ordered names.</p></div><button class="copy">Copy</button></div><pre><code>chrome.runtime.onMessage.addListener((msg) =&gt; {
+  if (msg &amp;&amp; msg.type === &quot;download&quot;) {
+    chrome.downloads.download({
+      url: msg.url,
+      filename: &quot;FlowBatch/&quot; + msg.filename,
+      conflictAction: &quot;uniquify&quot;
+    });
+  }
+});
+</code></pre></section>
+<section><div class="hd"><div><h2>content.js</h2><p>Runs the queue inside the Flow tab.</p></div><button class="copy">Copy</button></div><pre><code>(() =&gt; {
+  if (window.__flowBatch) return;
+  window.__flowBatch = true;
+
+  const sleep = (ms) =&gt; new Promise((r) =&gt; setTimeout(r, ms));
+  const get = (k) =&gt; new Promise((r) =&gt; chrome.storage.local.get(k, (v) =&gt; r(v[k])));
+  const set = (k, v) =&gt; new Promise((r) =&gt; chrome.storage.local.set({ [k]: v }, r));
+  const visible = (el) =&gt; {
+    const r = el.getBoundingClientRect();
+    return r.width &gt; 0 &amp;&amp; r.height &gt; 0;
+  };
+  const DELAYS = { slow: [15, 25], balanced: [6, 10], fast: [1, 3] };
+  let busy = false;
+
+  async function log(run, msg) {
+    run.log = [...(run.log || []).slice(-40), new Date().toLocaleTimeString() + &quot;  &quot; + msg];
+    await set(&quot;run&quot;, run);
+  }
+
+  // ---------- DOM helpers (edit these if Flow&#x27;s layout changes) ----------
+  function clickByText(text) {
+    const sel = &#x27;button,[role=&quot;button&quot;],[role=&quot;option&quot;],[role=&quot;menuitem&quot;],[role=&quot;tab&quot;],[role=&quot;radio&quot;],li,[tabindex]&#x27;;
+    const items = [...document.querySelectorAll(sel)].filter(visible);
+    const t = text.toLowerCase();
+    const label = (e) =&gt; ((e.getAttribute(&quot;aria-label&quot;) || &quot;&quot;) + &quot;|&quot; + e.textContent).toLowerCase();
+    const el =
+      items.find((e) =&gt; e.textContent.trim().toLowerCase() === t) ||
+      items.find((e) =&gt; (e.getAttribute(&quot;aria-label&quot;) || &quot;&quot;).toLowerCase() === t) ||
+      items.find((e) =&gt; label(e).includes(t) &amp;&amp; e.textContent.length &lt; 60);
+    if (el) { el.click(); return true; }
+    return false;
+  }
+
+  function promptBox() {
+    const c = [...document.querySelectorAll(&#x27;textarea,[contenteditable=&quot;true&quot;],[role=&quot;textbox&quot;]&#x27;)].filter(visible);
+    c.sort((a, b) =&gt; b.getBoundingClientRect().width - a.getBoundingClientRect().width);
+    return c[0];
+  }
+
+  function setPrompt(box, text) {
+    box.focus();
+    if (box.tagName === &quot;TEXTAREA&quot; || box.tagName === &quot;INPUT&quot;) {
+      const proto = box.tagName === &quot;TEXTAREA&quot; ? HTMLTextAreaElement : HTMLInputElement;
+      Object.getOwnPropertyDescriptor(proto.prototype, &quot;value&quot;).set.call(box, text);
+      box.dispatchEvent(new Event(&quot;input&quot;, { bubbles: true }));
+    } else {
+      document.execCommand(&quot;selectAll&quot;, false, null);
+      document.execCommand(&quot;insertText&quot;, false, text);
+    }
+  }
+
+  function submit(box) {
+    const re = /(^|\s)(create|generate|run|send|submit)\b|arrow_forward|arrow_upward/i;
+    const br = box.getBoundingClientRect();
+    const dist = (e) =&gt; {
+      const r = e.getBoundingClientRect();
+      return Math.hypot(r.x - br.x, r.y - br.y);
+    };
+    const btns = [...document.querySelectorAll(&#x27;button,[role=&quot;button&quot;]&#x27;)]
+      .filter(visible)
+      .filter((b) =&gt; !b.disabled &amp;&amp; b.getAttribute(&quot;aria-disabled&quot;) !== &quot;true&quot;)
+      .filter((b) =&gt; re.test((b.getAttribute(&quot;aria-label&quot;) || &quot;&quot;) + &quot; &quot; + b.textContent.trim()))
+      .sort((a, b) =&gt; dist(a) - dist(b));
+    if (btns[0]) { btns[0].click(); return true; }
+    box.dispatchEvent(new KeyboardEvent(&quot;keydown&quot;, { key: &quot;Enter&quot;, code: &quot;Enter&quot;, keyCode: 13, bubbles: true }));
+    return false;
+  }
+
+  function media() {
+    const seen = new Set();
+    return [...document.querySelectorAll(&quot;img,video&quot;)]
+      .filter((e) =&gt; {
+        const r = e.getBoundingClientRect();
+        return r.width &gt; 120 &amp;&amp; r.height &gt; 120;
+      })
+      .map((e) =&gt; ({ src: e.currentSrc || e.src, video: e.tagName === &quot;VIDEO&quot; }))
+      .filter((m) =&gt; m.src &amp;&amp; !m.src.startsWith(&quot;data:image/svg&quot;) &amp;&amp; !seen.has(m.src) &amp;&amp; seen.add(m.src));
+  }
+
+  async function waitForNew(known, count, timeoutMs) {
+    const start = Date.now();
+    let found = [];
+    while (Date.now() - start &lt; timeoutMs) {
+      if (await get(&quot;stop&quot;)) return found;
+      found = media().filter((m) =&gt; !known.has(m.src));
+      if (found.length &gt;= count) { await sleep(3000); return media().filter((m) =&gt; !known.has(m.src)).slice(0, count); }
+      await sleep(2000);
+    }
+    return found;
+  }
+
+  async function save(item, name) {
+    const ext = item.video ? &quot;mp4&quot; : &quot;png&quot;;
+    if (item.src.startsWith(&quot;blob:&quot;) || item.src.startsWith(&quot;data:&quot;)) {
+      const blob = await (await fetch(item.src)).blob();
+      const a = document.createElement(&quot;a&quot;);
+      a.href = URL.createObjectURL(blob);
+      a.download = name + &quot;.&quot; + ext;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() =&gt; URL.revokeObjectURL(a.href), 10000);
+    } else {
+      chrome.runtime.sendMessage({ type: &quot;download&quot;, url: item.src, filename: name + &quot;.&quot; + ext });
+    }
+  }
+
+  const slug = (s) =&gt; s.toLowerCase().replace(/[^a-z0-9]+/g, &quot;-&quot;).split(&quot;-&quot;).filter(Boolean).slice(0, 5).join(&quot;-&quot;);
+
+  // ---------- queue ----------
+  async function applySettings(run) {
+    const o = run.cfg[run.cfg.mode];
+    const wanted = [o.model, o.aspect, o.duration].filter(Boolean);
+    for (const w of wanted) {
+      const ok = clickByText(w);
+      await log(run, ok ? &quot;Selected &quot; + w : &quot;Could not find &#x27;&quot; + w + &quot;&#x27; - set it by hand once&quot;);
+      await sleep(600);
+    }
+    const n = o.count;
+    if (n &amp;&amp; !(clickByText(&quot;x&quot; + n) || clickByText(&quot;\u00d7&quot; + n))) await log(run, &quot;Could not find x&quot; + n + &quot; - set it by hand once&quot;);
+  }
+
+  async function finish(run, status) {
+    run.status = status;
+    await log(run, status === &quot;done&quot; ? &quot;Finished&quot; : &quot;Stopped&quot;);
+    const hist = (await get(&quot;hist&quot;)) || [];
+    hist.unshift({ ts: Date.now(), status, total: run.prompts.length, done: run.done, prompts: run.prompts });
+    await set(&quot;hist&quot;, hist.slice(0, 10));
+  }
+
+  async function runQueue() {
+    if (busy) return;
+    busy = true;
+    try {
+      let run = await get(&quot;run&quot;);
+      if (!run || run.status !== &quot;running&quot;) return;
+      if (!run.applied) { await applySettings(run); run.applied = true; await set(&quot;run&quot;, run); }
+      const known = new Set(media().map((m) =&gt; m.src));
+      const o = run.cfg[run.cfg.mode];
+      const count = parseInt(o.count || &quot;1&quot;, 10);
+      const timeout = run.cfg.mode === &quot;video&quot; ? 12 * 60000 : 3 * 60000;
+
+      while (run.index &lt; run.prompts.length) {
+        if (await get(&quot;stop&quot;)) { await finish(run, &quot;stopped&quot;); return; }
+        const text = run.prompts[run.index];
+        const num = String(run.index + 1).padStart(3, &quot;0&quot;);
+        await log(run, &quot;Prompt &quot; + num + &quot;: &quot; + text.slice(0, 40));
+        try {
+          const box = promptBox();
+          if (!box) throw new Error(&quot;prompt box not found&quot;);
+          setPrompt(box, text);
+          await sleep(700);
+          submit(box);
+          const got = await waitForNew(known, count, timeout);
+          if (!got.length) throw new Error(&quot;no result before timeout&quot;);
+          for (let i = 0; i &lt; got.length; i++) {
+            known.add(got[i].src);
+            const name = run.cfg.naming === &quot;slug&quot; ? num + &quot;-&quot; + slug(text) + &quot;_v&quot; + (i + 1) : num + &quot;_v&quot; + (i + 1);
+            await save(got[i], name);
+          }
+          run.done++;
+        } catch (e) {
+          run.failed = (run.failed || 0) + 1;
+          await log(run, &quot;Failed &quot; + num + &quot;: &quot; + e.message);
+        }
+        run.index++;
+        await set(&quot;run&quot;, run);
+        if (run.index &lt; run.prompts.length) {
+          const [lo, hi] = run.cfg.speed === &quot;custom&quot;
+            ? [run.cfg.customDelay, run.cfg.customDelay]
+            : DELAYS[run.cfg.speed] || DELAYS.balanced;
+          await sleep((lo + Math.random() * (hi - lo)) * 1000);
+        }
+      }
+      await finish(run, &quot;done&quot;);
+    } finally {
+      busy = false;
+    }
+  }
+
+  chrome.runtime.onMessage.addListener((msg, _s, reply) =&gt; {
+    if (msg &amp;&amp; msg.type === &quot;start&quot;) {
+      (async () =&gt; {
+        await set(&quot;stop&quot;, false);
+        await set(&quot;run&quot;, {
+          status: &quot;running&quot;, prompts: msg.prompts, cfg: msg.cfg,
+          index: 0, done: 0, failed: 0, applied: false, log: []
+        });
+        runQueue();
+        reply({ ok: true });
+      })();
+      return true;
+    }
+    if (msg &amp;&amp; msg.type === &quot;ping&quot;) reply({ ok: true });
+  });
+
+  // resume after page reload
+  get(&quot;run&quot;).then((r) =&gt; { if (r &amp;&amp; r.status === &quot;running&quot;) setTimeout(runQueue, 4000); });
+})();
+</code></pre></section>
+<section><div class="hd"><div><h2>popup.html</h2><p>The panel you open from the toolbar.</p></div><button class="copy">Copy</button></div><pre><code>&lt;!doctype html&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;popup.css&quot;&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;&lt;h1&gt;Flow Batch&lt;/h1&gt;&lt;span id=&quot;state&quot; class=&quot;pill&quot;&gt;Idle&lt;/span&gt;&lt;/header&gt;
+&lt;nav class=&quot;tabs&quot;&gt;&lt;button data-mode=&quot;image&quot;&gt;Images&lt;/button&gt;&lt;button data-mode=&quot;video&quot;&gt;Videos&lt;/button&gt;&lt;/nav&gt;
+&lt;section id=&quot;opts&quot;&gt;&lt;/section&gt;
+&lt;h2&gt;Speed&lt;/h2&gt;&lt;div class=&quot;chips&quot; id=&quot;speed&quot;&gt;&lt;/div&gt;
+&lt;label id=&quot;customRow&quot; hidden&gt;Delay between prompts (seconds) &lt;input id=&quot;customDelay&quot; type=&quot;number&quot; min=&quot;0&quot; value=&quot;10&quot;&gt;&lt;/label&gt;
+&lt;h2&gt;Prompts &lt;small id=&quot;count&quot;&gt;0&lt;/small&gt;&lt;/h2&gt;
+&lt;textarea id=&quot;prompts&quot; placeholder=&quot;Paste prompts here. Separate each prompt with a blank line.&quot;&gt;&lt;/textarea&gt;
+&lt;div class=&quot;row&quot;&gt;
+  &lt;label class=&quot;btn&quot;&gt;Load .txt&lt;input type=&quot;file&quot; id=&quot;file&quot; accept=&quot;.txt,text/plain&quot; hidden&gt;&lt;/label&gt;
+  &lt;button id=&quot;clear&quot; class=&quot;btn&quot;&gt;Clear&lt;/button&gt;
+&lt;/div&gt;
+&lt;h2&gt;File names&lt;/h2&gt;&lt;div class=&quot;chips&quot; id=&quot;naming&quot;&gt;&lt;/div&gt;
+&lt;div id=&quot;bar&quot;&gt;&lt;div id=&quot;fill&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;pre id=&quot;log&quot;&gt;Open a Google Flow tab, then press Start.&lt;/pre&gt;
+&lt;h2&gt;History&lt;/h2&gt;&lt;div id=&quot;hist&quot;&gt;&lt;/div&gt;
+&lt;footer&gt;&lt;button id=&quot;start&quot; class=&quot;primary&quot;&gt;Start&lt;/button&gt;&lt;button id=&quot;stop&quot; class=&quot;btn&quot;&gt;Stop&lt;/button&gt;&lt;/footer&gt;
+&lt;script src=&quot;popup.js&quot;&gt;&lt;/script&gt;
+&lt;/body&gt;&lt;/html&gt;
+</code></pre></section>
+<section><div class="hd"><div><h2>popup.css</h2><p>Panel styling.</p></div><button class="copy">Copy</button></div><pre><code>:root{--bg:#101114;--panel:#1a1c21;--line:#2c2f37;--text:#eceef2;--mute:#8b909c;--accent:#7cc4ff;--bad:#ff8a80}
+*{box-sizing:border-box}
+body{margin:0;width:380px;max-width:100%;padding:14px 14px 80px;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:18px;margin:0}
+h2{font-size:13px;font-weight:600;color:var(--mute);margin:16px 0 6px}
+h2 small{font-weight:400}
+.pill{padding:3px 10px;border:1px solid var(--line);border-radius:99px;color:var(--mute);font-size:12px}
+.pill.run{color:var(--accent);border-color:var(--accent)}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 0;padding:4px;border:1px solid var(--line);border-radius:12px}
+button,.btn{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;text-align:center}
+.tabs button{border-color:transparent;background:none;color:var(--mute)}
+.tabs button.on{background:var(--panel);border-color:var(--line);color:var(--text)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{padding:6px 10px}
+.chips button.on{border-color:var(--accent);color:var(--accent)}
+textarea{width:100%;height:130px;resize:vertical;background:var(--panel);color:var(--text);border:1px dashed var(--line);border-radius:10px;padding:10px;font:inherit}
+.row{display:flex;gap:8px;margin-top:8px}
+input[type=number]{width:70px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:5px}
+#customRow{display:block;margin-top:8px;color:var(--mute)}
+#bar{height:5px;background:var(--panel);border-radius:9px;margin-top:16px;overflow:hidden}
+#fill{height:100%;width:0;background:var(--accent);transition:width .3s}
+pre{margin:8px 0 0;max-height:110px;overflow:auto;white-space:pre-wrap;color:var(--mute);font-size:12px}
+.h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);color:var(--mute);font-size:12px}
+footer{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;padding:12px 14px;background:var(--bg);border-top:1px solid var(--line)}
+footer button{flex:1}
+.primary{background:var(--accent);color:#06121c;border-color:var(--accent);font-weight:600}
+[hidden]{display:none!important}
+</code></pre></section>
+<section><div class="hd"><div><h2>popup.js</h2><p>Panel logic: settings, prompts, history.</p></div><button class="copy">Copy</button></div><pre><code>const OPTS = {
+  image: { model: [&quot;Nano Banana Pro&quot;, &quot;Nano Banana 2.1&quot;, &quot;Nano Banana Lite&quot;], aspect: [&quot;16:9&quot;, &quot;4:3&quot;, &quot;1:1&quot;, &quot;3:4&quot;, &quot;9:16&quot;], count: [&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;] },
+  video: { model: [&quot;Veo 3.1 Fast&quot;, &quot;Veo 3.1 Quality&quot;, &quot;Veo 3.1 Lite&quot;], aspect: [&quot;16:9&quot;, &quot;9:16&quot;], duration: [&quot;4s&quot;, &quot;6s&quot;, &quot;8s&quot;], count: [&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;] }
+};
+const TITLES = { model: &quot;Model&quot;, aspect: &quot;Aspect ratio&quot;, count: &quot;Outputs per prompt&quot;, duration: &quot;Duration&quot; };
+let cfg = {
+  mode: &quot;image&quot;, speed: &quot;balanced&quot;, customDelay: 10, naming: &quot;num&quot;,
+  image: { model: &quot;Nano Banana Pro&quot;, aspect: &quot;16:9&quot;, count: &quot;1&quot; },
+  video: { model: &quot;Veo 3.1 Fast&quot;, aspect: &quot;16:9&quot;, duration: &quot;8s&quot;, count: &quot;1&quot; }
+};
+const $ = (id) =&gt; document.getElementById(id);
+const store = (o) =&gt; chrome.storage.local.set(o);
+
+function chips(el, items, value, pick) {
+  el.innerHTML = &quot;&quot;;
+  items.forEach(([val, label]) =&gt; {
+    const b = document.createElement(&quot;button&quot;);
+    b.textContent = label; b.className = val === value ? &quot;on&quot; : &quot;&quot;;
+    b.onclick = () =&gt; { pick(val); store({ cfg }); draw(); };
+    el.appendChild(b);
+  });
+}
+
+function draw() {
+  document.querySelectorAll(&quot;.tabs button&quot;).forEach((b) =&gt; b.classList.toggle(&quot;on&quot;, b.dataset.mode === cfg.mode));
+  const box = $(&quot;opts&quot;); box.innerHTML = &quot;&quot;;
+  Object.entries(OPTS[cfg.mode]).forEach(([key, list]) =&gt; {
+    const h = document.createElement(&quot;h2&quot;); h.textContent = TITLES[key];
+    const c = document.createElement(&quot;div&quot;); c.className = &quot;chips&quot;;
+    chips(c, list.map((v) =&gt; [v, key === &quot;count&quot; ? &quot;x&quot; + v : v]), cfg[cfg.mode][key], (v) =&gt; (cfg[cfg.mode][key] = v));
+    box.append(h, c);
+  });
+  chips($(&quot;speed&quot;), [[&quot;slow&quot;, &quot;Slow&quot;], [&quot;balanced&quot;, &quot;Balanced&quot;], [&quot;fast&quot;, &quot;Fast&quot;], [&quot;custom&quot;, &quot;Custom&quot;]], cfg.speed, (v) =&gt; (cfg.speed = v));
+  chips($(&quot;naming&quot;), [[&quot;num&quot;, &quot;001_v1&quot;], [&quot;slug&quot;, &quot;001-prompt_v1&quot;]], cfg.naming, (v) =&gt; (cfg.naming = v));
+  $(&quot;customRow&quot;).hidden = cfg.speed !== &quot;custom&quot;;
+  $(&quot;customDelay&quot;).value = cfg.customDelay;
+}
+
+const parse = () =&gt; $(&quot;prompts&quot;).value.split(/\n\s*\n/).map((s) =&gt; s.trim()).filter(Boolean);
+function updateCount() { $(&quot;count&quot;).textContent = parse().length + &quot; prompts&quot;; store({ draft: $(&quot;prompts&quot;).value }); }
+
+function renderRun(run) {
+  if (!run) return;
+  const total = run.prompts.length, n = run.index;
+  $(&quot;state&quot;).textContent = run.status === &quot;running&quot; ? &quot;Running &quot; + n + &quot;/&quot; + total : run.status === &quot;done&quot; ? &quot;Done&quot; : &quot;Stopped&quot;;
+  $(&quot;state&quot;).className = &quot;pill&quot; + (run.status === &quot;running&quot; ? &quot; run&quot; : &quot;&quot;);
+  $(&quot;fill&quot;).style.width = (total ? (n / total) * 100 : 0) + &quot;%&quot;;
+  $(&quot;log&quot;).textContent = (run.log || []).join(&quot;\n&quot;);
+  $(&quot;log&quot;).scrollTop = 1e6;
+}
+
+function renderHist(hist) {
+  const box = $(&quot;hist&quot;); box.innerHTML = &quot;&quot;;
+  (hist || []).forEach((h) =&gt; {
+    const d = document.createElement(&quot;div&quot;); d.className = &quot;h&quot;;
+    const t = document.createElement(&quot;span&quot;);
+    t.textContent = new Date(h.ts).toLocaleString() + &quot; - &quot; + h.done + &quot;/&quot; + h.total + &quot; &quot; + h.status;
+    const b = document.createElement(&quot;button&quot;); b.textContent = &quot;Load&quot;;
+    b.onclick = () =&gt; { $(&quot;prompts&quot;).value = h.prompts.join(&quot;\n\n&quot;); updateCount(); };
+    d.append(t, b); box.appendChild(d);
+  });
+}
+
+async function start() {
+  const prompts = parse();
+  if (!prompts.length) return ($(&quot;log&quot;).textContent = &quot;Add at least one prompt.&quot;);
+  const tabs = await chrome.tabs.query({ url: &quot;https://labs.google/*&quot; });
+  if (!tabs.length) return ($(&quot;log&quot;).textContent = &quot;No Google Flow tab found. Open Flow in a tab, then press Start.&quot;);
+  const tab = tabs.find((t) =&gt; t.active) || tabs[0];
+  cfg.customDelay = parseInt($(&quot;customDelay&quot;).value, 10) || 10;
+  store({ cfg });
+  chrome.tabs.sendMessage(tab.id, { type: &quot;start&quot;, prompts, cfg }, (res) =&gt; {
+    if (chrome.runtime.lastError) $(&quot;log&quot;).textContent = &quot;Reload the Flow tab once, then press Start.&quot;;
+  });
+}
+
+document.querySelectorAll(&quot;.tabs button&quot;).forEach((b) =&gt; (b.onclick = () =&gt; { cfg.mode = b.dataset.mode; store({ cfg }); draw(); }));
+$(&quot;prompts&quot;).oninput = updateCount;
+$(&quot;clear&quot;).onclick = () =&gt; { $(&quot;prompts&quot;).value = &quot;&quot;; updateCount(); };
+$(&quot;file&quot;).onchange = async (e) =&gt; { const f = e.target.files[0]; if (f) { $(&quot;prompts&quot;).value = await f.text(); updateCount(); } };
+$(&quot;start&quot;).onclick = start;
+$(&quot;stop&quot;).onclick = () =&gt; store({ stop: true });
+$(&quot;customDelay&quot;).onchange = () =&gt; { cfg.customDelay = parseInt($(&quot;customDelay&quot;).value, 10) || 10; store({ cfg }); };
+
+chrome.storage.onChanged.addListener((c) =&gt; { if (c.run) renderRun(c.run.newValue); if (c.hist) renderHist(c.hist.newValue); });
+chrome.storage.local.get([&quot;cfg&quot;, &quot;draft&quot;, &quot;run&quot;, &quot;hist&quot;], (s) =&gt; {
+  if (s.cfg) cfg = { ...cfg, ...s.cfg };
+  if (s.draft) $(&quot;prompts&quot;).value = s.draft;
+  draw(); updateCount(); renderRun(s.run); renderHist(s.hist);
+});
+</code></pre></section>
+
+<script>
+document.querySelectorAll(".copy").forEach(function(b){b.onclick=function(){
+var t=b.closest("section").querySelector("code").textContent;
+function ok(){b.textContent="Copied";b.className="copy done";setTimeout(function(){b.textContent="Copy";b.className="copy"},1500)}
+function fb(){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");ok()}catch(e){b.textContent="Select text manually"}a.remove()}
+if(navigator.clipboard){navigator.clipboard.writeText(t).then(ok,fb)}else{fb()}
+}});
+</script></body></html>

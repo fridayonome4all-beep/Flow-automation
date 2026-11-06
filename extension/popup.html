@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FlowBatch</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Header with Project Status Chip -->
+  <header>
+    <div class="brand">
+      <div class="logo-dot"></div>
+      <h1>FlowBatch</h1>
+    </div>
+    <div class="status-wrap">
+      <span id="state" class="status-chip ready">Ready</span>
+    </div>
+  </header>
+
+  <!-- Multiple Queue Tabs -->
+  <div class="queue-bar">
+    <div id="queueTabs" class="queue-tabs">
+      <button class="q-tab on" data-qid="main">Main</button>
+      <button class="q-tab" data-qid="characters">Characters</button>
+      <button class="q-tab" data-qid="scenes">Scenes</button>
+    </div>
+    <button id="addQueueBtn" class="icon-btn" title="Add Queue Tab">+</button>
+  </div>
+
+  <!-- Primary Generation Mode (Images / Videos) -->
+  <nav class="mode-tabs">
+    <button data-mode="image" class="on">Images</button>
+    <button data-mode="video">Videos</button>
+  </nav>
+
+  <!-- Mode Options & Controls -->
+  <section id="opts"></section>
+
+  <!-- Video Modes (Start frame, Start+End, Reference) -->
+  <div id="videoModeSection" hidden>
+    <h2>Video Mode</h2>
+    <div class="chips" id="videoModes">
+      <button class="on" data-vmode="text">Text to Video</button>
+      <button data-vmode="start_frame">Start Frame</button>
+      <button data-vmode="start_end">Start + End</button>
+      <button data-vmode="reference">Reference</button>
+    </div>
+  </div>
+
+  <!-- Quality & Upscaling -->
+  <h2>Quality &amp; Upscale</h2>
+  <div class="chips" id="qualityChips">
+    <button data-res="720p">720p</button>
+    <button data-res="1080p">1080p</button>
+    <button data-res="2K">2K Quad HD</button>
+    <button data-res="4K" class="on">4K Ultra</button>
+  </div>
+  <label class="check-row">
+    <input type="checkbox" id="autoUpscale" checked>
+    <span>Auto-upscale output when generation finishes</span>
+  </label>
+
+  <!-- Reference Images: Subject, Scene, Style (Up to 100 each) -->
+  <div class="ref-accordion">
+    <div class="ref-header" id="refHeader">
+      <h2>Reference Images <span id="refBadge" class="dim">0 tagged</span></h2>
+      <button class="toggle-link" id="toggleRefBtn">Expand</button>
+    </div>
+    <div id="refPanel" hidden>
+      <div class="ref-tabs">
+        <button class="r-tab on" data-refcat="subject">Subject (100)</button>
+        <button class="r-tab" data-refcat="scene">Scene (100)</button>
+        <button class="r-tab" data-refcat="style">Style (100)</button>
+      </div>
+
+      <!-- Override toggle -->
+      <label class="check-row override-box">
+        <input type="checkbox" id="diffImageOverride">
+        <div>
+          <strong>Different image for each prompt</strong>
+          <small>Sequentially binds prompt index to Reference slots (@subject1, @subject2...)</small>
+        </div>
+      </label>
+
+      <!-- Slot preview list -->
+      <div id="slotsGrid" class="slots-grid"></div>
+    </div>
+  </div>
+
+  <!-- Speed & Naming -->
+  <h2>Speed &amp; Pace</h2>
+  <div class="chips" id="speed"></div>
+  <label id="customRow" hidden>Delay between prompts (seconds) <input id="customDelay" type="number" min="1" value="8"></label>
+
+  <!-- Prompts Editor & Scanner -->
+  <div class="prompts-hd">
+    <h2>Prompts <span id="count" class="dim">0 prompts</span></h2>
+    <div class="prompt-tools">
+      <label class="link-btn">Import File<input type="file" id="file" accept=".txt,.csv,.json" hidden></label>
+      <button id="scanBtn" class="link-btn">Scan @Tags</button>
+      <button id="clear" class="link-btn">Clear</button>
+    </div>
+  </div>
+
+  <textarea id="prompts" placeholder="Paste prompts here (separate by empty line). Mention @tags like @subject1, @scene1, or @style1 to automatically link references."></textarea>
+  <div id="detectedTagsBar" class="tag-bar" hidden></div>
+
+  <!-- Reliability & Auto-Refresh -->
+  <label class="check-row">
+    <input type="checkbox" id="autoRefreshTab" checked>
+    <span>Auto-refresh Flow tab every 10 prompts (clears memory leaks)</span>
+  </label>
+
+  <!-- File Naming -->
+  <h2>File Names</h2>
+  <div class="chips" id="naming"></div>
+
+  <!-- Progress Bar & Log -->
+  <div id="bar"><div id="fill"></div></div>
+  <pre id="log">Open a Google Flow tab (labs.google), then press Start.</pre>
+
+  <!-- Cache & Remote Config Actions -->
+  <div class="util-row">
+    <button id="clearCacheBtn" class="text-btn">Clear Cache</button>
+    <button id="syncConfigBtn" class="text-btn">Check Remote Config</button>
+  </div>
+
+  <!-- History -->
+  <h2>History</h2>
+  <div id="hist"></div>
+
+  <!-- Footer Sticky Controls -->
+  <footer>
+    <button id="start" class="primary">Start Queue</button>
+    <button id="stop" class="btn">Stop</button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
